@@ -15,13 +15,22 @@ st.set_page_config(
 @st.cache_resource
 def load_model():
     try:
-        model = joblib.load('fake_job_model.pkl')
-        return model
-    except FileNotFoundError:
-        st.error("Model file 'fake_job_model.pkl' tidak ditemukan. Silakan train model terlebih dahulu.")
+        # Load preprocessor
+        preprocessor = joblib.load('preprocessor.pkl')
+        
+        # Load XGBoost model (JSON format - lebih stabil)
+        booster = xgb.Booster()
+        booster.load_model('xgb_model.json')
+        
+        st.success("✅ Model berhasil dimuat (XGBoost 3.2.0)")
+        return preprocessor, booster
+    except Exception as e:
+        st.error(f"Gagal memuat model: {str(e)}")
+        st.error("Pastikan preprocessor.pkl dan xgb_model.json ada di root folder")
         st.stop()
 
-pipeline = load_model()
+# Load model sekali di awal
+preprocessor, booster = load_model()
 
 # ====================== TITLE & DESCRIPTION ======================
 st.title("Fake Job Posting Detector")
@@ -110,11 +119,17 @@ if st.button("Prediksi Sekarang", type="primary", use_container_width=True):
             'text_combined': f"{title} {company_profile} {description} {requirements} {benefits}"
         }])
 
-        # Prediksi
-        prediction = pipeline.predict(input_data)[0]
-        probability = pipeline.predict_proba(input_data)[0][1]  # probabilitas fake
-        prob_fake = float(probability)          # konversi ke float Python
-        prob_fake = max(0.0, min(1.0, prob_fake))   # jaga agar tidak <0 atau >1 karena floating point
+        X_input_transformed = preprocessor.transform(input_data)
+
+        # Prediksi dengan booster
+        dmatrix = xgb.DMatrix(X_input_transformed)
+        raw_prob = booster.predict(dmatrix)[0]
+
+        prob_fake = float(raw_prob)
+        prob_fake = max(0.0, min(1.0, prob_fake))
+
+        prediction = 1 if prob_fake > 0.5 else 0
+        
         # Hasil
         if prediction == 1:
             st.error(f"**LOWONGAN INI DIDUGA PALSU**")
