@@ -119,13 +119,11 @@ if st.button("Prediksi Sekarang", type="primary", use_container_width=True):
             'text_combined': f"{title} {company_profile} {description} {requirements} {benefits}"
         }])
 
-        X_input_transformed = preprocessor.transform(input_data)
+        X_transformed = preprocessor.transform(input_data)
 
-        # Prediksi dengan booster
-        dmatrix = xgb.DMatrix(X_input_transformed)
-        raw_prob = booster.predict(dmatrix)[0]
-
-        prob_fake = float(raw_prob)
+        # Prediksi dengan XGBoost booster
+        dmatrix = xgb.DMatrix(X_transformed)
+        prob_fake = float(booster.predict(dmatrix)[0])
         prob_fake = max(0.0, min(1.0, prob_fake))
 
         prediction = 1 if prob_fake > 0.5 else 0
